@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Geo Guesser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- iro.js Color Picker Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .result-card {
+            transition: opacity 0.5s, transform 0.5s;
+        }
+        /* Container for the iro.js picker */
+        #iro-picker-container {
+            /* Ensures the picker is centered if its width is less than the container */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* Smooth transition for the button's color change */
+        #guessButton {
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 shadow-2xl rounded-2xl p-6 md:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">Color Geo Guesser</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-1">How well do you know your colors?</p>
+        </header>
+
+        <main class="flex flex-col gap-6">
+            <!-- Top section with the two columns -->
+            <div class="grid md:grid-cols-2 gap-6 md:gap-8 items-start">
+                <!-- Left Side: Target Color -->
+                <div class="flex flex-col items-center justify-center space-y-4">
+                    <h2 class="text-lg font-medium text-center">Match this Color</h2>
+                    <div id="targetColorBox" class="w-full rounded-xl shadow-lg" style="transition: background-color 0.5s ease;"></div>
+                </div>
+
+                <!-- Right Side: Guessing Area -->
+                <div class="flex flex-col items-center justify-center space-y-4">
+                    <h2 class="text-lg font-medium text-center">Pick Your Guess</h2>
+                    <!-- This container will hold the iro.js picker -->
+                    <div id="iro-picker-container" class="w-full"></div>
+                </div>
+            </div>
+            
+            <!-- Centered Button Area -->
+            <div class="flex justify-center mt-4">
+                <div class="w-full" style="max-width: 260px;">
+                    <button id="guessButton" class="w-full text-white font-bold py-3 px-4 rounded-lg shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500">
+                        Guess
+                    </button>
+                     <button id="nextRoundButton" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 hidden">
+                        Next Round
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Result Section -->
+        <div id="resultSection" class="mt-8">
+            <div id="resultCard" class="result-card bg-gray-50 dark:bg-gray-700/50 p-6 rounded-xl shadow-inner opacity-0 transform scale-95 hidden">
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Your Guess</h3>
+                        <div id="yourColorPreview" class="w-16 h-16 rounded-lg mx-auto mt-2 border-2 border-white/50 shadow-md"></div>
+                    </div>
+                    <div class="flex flex-col justify-center items-center">
+                         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Score</h3>
+                         <p id="score" class="text-4xl font-bold text-gray-900 dark:text-white mt-1">0%</p>
+                         <p id="feedback" class="text-sm text-gray-600 dark:text-gray-300"></p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Target</h3>
+                        <div id="targetColorPreview" class="w-16 h-16 rounded-lg mx-auto mt-2 border-2 border-white/50 shadow-md"></div>
+                    </div>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const targetColorBox = document.getElementById('targetColorBox');
+        const guessButton = document.getElementById('guessButton');
+        const nextRoundButton = document.getElementById('nextRoundButton');
+        const resultCard = document.getElementById('resultCard');
+        const yourColorPreview = document.getElementById('yourColorPreview');
+        const targetColorPreview = document.getElementById('targetColorPreview');
+        const scoreDisplay = document.getElementById('score');
+        const feedbackDisplay = document.getElementById('feedback');
+
+        // Game State
+        let targetColor = '';
+        let iroColorPicker = null;
+
+        // --- Color Conversion and Scoring Logic ---
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+        }
+
+        function rgbToLab(rgb) {
+            let r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
+            let x, y, z;
+            r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+            g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+            b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+            x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+            y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+            z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+            x = (x > 0.008856) ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+            y = (y > 0.008856) ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+            z = (z > 0.008856) ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+            return { l: (116 * y) - 16, a: 500 * (x - y), b: 200 * (y - z) };
+        }
+
+        function getColorDistanceLab(lab1, lab2) {
+            const deltaL = lab1.l - lab2.l;
+            const deltaA = lab1.a - lab2.a;
+            const deltaB = lab1.b - lab2.b;
+            return Math.sqrt(deltaL * deltaL + deltaA * deltaA + deltaB * deltaB);
+        }
+
+        function generateRandomColor() {
+            return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+        }
+        
+        function getFeedbackMessage(score) {
+            if (score === 100) return "Perfect Match! 🎯";
+            if (score >= 98) return "Incredible! Almost perfect!";
+            if (score >= 95) return "Excellent eye for color!";
+            if (score >= 90) return "Great guess!";
+            if (score >= 80) return "So close!";
+            if (score >= 60) return "Getting warmer...";
+            if (score >= 40) return "Not bad, try again!";
+            return "A bit far off, keep practicing!";
+        }
+
+        // --- Game Logic ---
+
+        function handleGuess() {
+            const guessedColorHex = iroColorPicker.color.hexString;
+            const targetRgb = hexToRgb(targetColor);
+            const guessedRgb = hexToRgb(guessedColorHex);
+            const targetLab = rgbToLab(targetRgb);
+            const guessedLab = rgbToLab(guessedRgb);
+            const distance = getColorDistanceLab(targetLab, guessedLab);
+            const score = Math.max(0, Math.round(100 - distance));
+
+            scoreDisplay.textContent = `${score}%`;
+            feedbackDisplay.textContent = getFeedbackMessage(score);
+            yourColorPreview.style.backgroundColor = guessedColorHex;
+            targetColorPreview.style.backgroundColor = targetColor;
+            
+            resultCard.classList.remove('hidden');
+            setTimeout(() => {
+                resultCard.classList.remove('opacity-0', 'scale-95');
+                resultCard.classList.add('opacity-100', 'scale-100');
+            }, 10);
+
+            guessButton.classList.add('hidden');
+            nextRoundButton.classList.remove('hidden');
+        }
+
+        function startNewRound() {
+            targetColor = generateRandomColor();
+            targetColorBox.style.backgroundColor = targetColor;
+
+            guessButton.classList.remove('hidden');
+            nextRoundButton.classList.add('hidden');
+            
+            resultCard.classList.add('opacity-0', 'scale-95');
+            resultCard.classList.remove('opacity-100', 'scale-100');
+            setTimeout(() => {
+                 resultCard.classList.add('hidden');
+            }, 500);
+        }
+
+        // Event Listeners
+        guessButton.addEventListener('click', handleGuess);
+        nextRoundButton.addEventListener('click', startNewRound);
+
+        // Initialize the game and the color picker on page load
+        window.onload = function() {
+            // Initialize iro.js color picker
+            iroColorPicker = new iro.ColorPicker('#iro-picker-container', {
+                width: 260, // A good width for the layout
+                color: "#808080", // Initial color
+                borderWidth: 1,
+                borderColor: "#cccccc",
+                layout: [
+                    { component: iro.ui.Wheel },
+                    { component: iro.ui.Slider, options: { sliderType: 'hue' } },
+                    { component: iro.ui.Slider, options: { sliderType: 'saturation' } },
+                    { component: iro.ui.Slider, options: { sliderType: 'value' } },
+                ]
+            });
+
+            // --- NEW: Update button color on picker change ---
+            iroColorPicker.on('color:change', function(color) {
+                // Set the button's background color
+                guessButton.style.backgroundColor = color.hexString;
+
+                // Set the button's focus ring color
+                guessButton.style.setProperty('--tw-ring-color', color.hexString);
+
+                // Change text color for better contrast
+                // iro.js provides a 'luma' property (0-1) for perceived brightness
+                if (color.luma > 0.55) {
+                    guessButton.style.color = '#000000'; // Black text for light colors
+                } else {
+                    guessButton.style.color = '#FFFFFF'; // White text for dark colors
+                }
+            });
+            // Set initial button color
+            guessButton.style.backgroundColor = iroColorPicker.color.hexString;
+            guessButton.style.setProperty('--tw-ring-color', iroColorPicker.color.hexString);
+
+            // Match the height of the target color box to the picker container
+            const pickerContainer = document.getElementById('iro-picker-container');
+            const targetBox = document.getElementById('targetColorBox');
+            
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    const pickerHeight = entry.contentRect.height;
+                    if (pickerHeight > 0) {
+                        targetBox.style.height = `${pickerHeight}px`;
+                    }
+                }
+            });
+            resizeObserver.observe(pickerContainer);
+
+            startNewRound();
+        };
+    </script>
+</body>
+</html>
