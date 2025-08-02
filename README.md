@@ -2,8 +2,6 @@
 
 A fun and challenging web-based game designed to test and improve your color perception. See a color, pick your guess from an interactive color wheel, and get a score based on how close you are!
 
-![Screenshot of the Color Guesser Game](https://placehold.co/800x450/e2e8f0/4a5568?text=Game+Screenshot+Here)
-
 ---
 
 ## How to Play
