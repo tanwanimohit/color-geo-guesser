@@ -44,6 +44,11 @@
         <header class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">Color Geo Guesser</h1>
             <p class="text-gray-600 dark:text-gray-400 mt-1">How well do you know your colors?</p>
+            <!-- Best Score Display -->
+            <div class="mt-4">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Best Score:</span>
+                <span id="bestScoreDisplay" class="text-lg font-bold text-blue-600 dark:text-blue-400">0%</span>
+            </div>
         </header>
 
         <main class="flex flex-col gap-6">
@@ -108,10 +113,12 @@
         const targetColorPreview = document.getElementById('targetColorPreview');
         const scoreDisplay = document.getElementById('score');
         const feedbackDisplay = document.getElementById('feedback');
+        const bestScoreDisplay = document.getElementById('bestScoreDisplay');
 
         // Game State
         let targetColor = '';
         let iroColorPicker = null;
+        let bestScore = 0;
 
         // --- Color Conversion and Scoring Logic ---
 
@@ -168,6 +175,13 @@
             const distance = getColorDistanceLab(targetLab, guessedLab);
             const score = Math.max(0, Math.round(100 - distance));
 
+            // Update best score if current score is higher
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('colorGuesserBestScore', bestScore);
+                bestScoreDisplay.textContent = `${bestScore}%`;
+            }
+
             scoreDisplay.textContent = `${score}%`;
             feedbackDisplay.textContent = getFeedbackMessage(score);
             yourColorPreview.style.backgroundColor = guessedColorHex;
@@ -205,8 +219,8 @@
         window.onload = function() {
             // Initialize iro.js color picker
             iroColorPicker = new iro.ColorPicker('#iro-picker-container', {
-                width: 260, // A good width for the layout
-                color: "#808080", // Initial color
+                width: 260,
+                color: "#808080",
                 borderWidth: 1,
                 borderColor: "#cccccc",
                 layout: [
@@ -217,25 +231,25 @@
                 ]
             });
 
-            // --- NEW: Update button color on picker change ---
+            // Update button color on picker change
             iroColorPicker.on('color:change', function(color) {
-                // Set the button's background color
                 guessButton.style.backgroundColor = color.hexString;
-
-                // Set the button's focus ring color
                 guessButton.style.setProperty('--tw-ring-color', color.hexString);
-
-                // Change text color for better contrast
-                // iro.js provides a 'luma' property (0-1) for perceived brightness
                 if (color.luma > 0.55) {
-                    guessButton.style.color = '#000000'; // Black text for light colors
+                    guessButton.style.color = '#000000';
                 } else {
-                    guessButton.style.color = '#FFFFFF'; // White text for dark colors
+                    guessButton.style.color = '#FFFFFF';
                 }
             });
-            // Set initial button color
             guessButton.style.backgroundColor = iroColorPicker.color.hexString;
             guessButton.style.setProperty('--tw-ring-color', iroColorPicker.color.hexString);
+
+            // Load best score from localStorage
+            const savedBestScore = localStorage.getItem('colorGuesserBestScore');
+            if (savedBestScore) {
+                bestScore = parseInt(savedBestScore, 10);
+                bestScoreDisplay.textContent = `${bestScore}%`;
+            }
 
             // Match the height of the target color box to the picker container
             const pickerContainer = document.getElementById('iro-picker-container');
